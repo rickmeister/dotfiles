@@ -1,0 +1,126 @@
+function! InsertModeLine()
+python << endpython
+import vim,os
+unitname=vim.eval("expand('%:r')")
+vim.current.buffer[0:0]=['unit '+unitname+';']
+header=open('C:\\Users\\Rickard\\.vim\\.pascalheader')
+i=1
+for line in header:
+    vim.current.buffer[i:0] = [line.rstrip()]
+    i=i+1
+vim.command(":25")
+header.close()
+del vim
+endpython
+endfunc
+
+augroup Delphi
+    autocmd!
+    autocmd BufNewFile,BufRead *.pas,*.pp,*.dpr :set tabstop=4
+    autocmd BufNewFile,BufRead *.pas,*.pp,*.dpr :set shiftwidth=4
+    autocmd BufNewFile,BufRead *.pas,*.pp,*.dpr :set softtabstop=4
+    autocmd BufNewFile,BufRead *.pas,*.pp,*.dpr :set expandtab
+    autocmd BufNewFile,BufRead *.pas,*.pp,*.dpr :set nospell
+    autocmd BufNewFile,BufRead *.pas,*.pp,*.dpr :let g:pascal_delphi=1
+    autocmd BufNewFile *.pas,*.pp :call InsertModeLine()
+    autocmd BufNewFile,BufRead *.pas,*.pp,*.lpr,*.dpr :nmap <C-i> <esc>:call CodeComplete()<cr><esc>
+augroup END
+
+augroup Python
+    autocmd!
+    autocmd BufNewFile,BufRead *.py :nmap <F5> :w<cr>:!python %<cr>
+    autocmd BufNewFile,BufRead *.py :imap <F5> <esc>:w<cr>:!python %<cr>
+augroup END
+
+augroup FreeBasic
+    autocmd!
+    autocmd BufNewFile,BufRead *.bas,*.bi :set ft=FreeBasic
+    autocmd BufNewFile,BufRead *.bas,*.bi :set nospell
+augroup END
+
+function! CodeComplete() abort
+python << EOF
+import vim
+import re
+
+
+def findClassName():
+    regex = "((?P<classname>^\w*)\s*=\s*(class)\s*$)"
+    line = vim.current.window.cursor[0]
+    for i in range(line,0,-1):
+        match = re.match(regex,vim.current.buffer[i].lstrip(),re.IGNORECASE)
+        if match:
+            classname = match.groupdict().get("classname")
+            return classname
+    return None
+
+def createCode(match):
+    classname=findClassName()
+    dict = match.groupdict()
+    static = dict.get("static")
+    code = []
+    if static:
+        code.append("class ")
+    code.append(dict.get("decl"))
+    code.append(" "+classname+".")
+    code.append(dict.get("id"))
+    if dict.get("params"):
+        code.append(dict.get("params"))
+    if dict.get("result"):
+        code.append(dict.get("result"))
+    code.append(";")
+    return (classname,code)
+
+def findPattern(bufline):
+    regex = "((?P<static>^class)?\s*(?P<decl>function|procedure|constructor|destructor)\s*(?P<id>\w+)\s*((?P<params>\((.+)\))?)((?P<result>(\s*\:\s*\w+\s*))?)(?P<endl>\;))"
+    match = re.match(regex,bufline,re.IGNORECASE)
+    if match:
+        return createCode(match)
+    return (None,None)
+
+def findInsertLine(current,classname,insert):
+    impl = 0
+    start = "{>> " + classname + " <<}"
+    startpos = 0
+    end = "{<< " + classname + " >>}"
+    endpos = 0
+    code = ""
+    for items in insert:
+        code = code+items
+    print code
+    insert = []
+    insert.append(code);
+    insert.append("begin");
+    insert.append("\n")
+    insert.append("end;")
+    for i in range(current,len(vim.current.buffer)):
+        if "implementation" in vim.current.buffer[i]:
+            impl = i
+        if start in vim.current.buffer[i]:
+            startpos = i
+        if end in vim.current.buffer[i] or "end." in vim.current.buffer[i] or "initialization" in vim.current.buffer[i]:
+            endpos = i
+            break
+    if startpos > 0 and endpos > 0:
+        for i in range(0,len(insert)):
+            vim.current.buffer.append(insert[i],startpos+1+i);
+    else:
+        insert.insert(0,start)
+        insert.append(end)
+        for i in range(0,len(insert)):
+            vim.current.buffer.append(insert[i], impl+1+i)
+
+cursor=vim.current.window.cursor
+buf=vim.current.buffer
+line=cursor[0]-1 #-1 as first line is 0
+bufline=buf[line].lstrip()
+c = findPattern(bufline)
+findInsertLine(cursor[0],c[0],c[1])
+vim.current.window.cursor = cursor
+EOF
+endfunction
+
+
+set noeb vb t_vb=
+
+" FreeBasic stuff
