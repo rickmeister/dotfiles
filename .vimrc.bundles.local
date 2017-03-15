@@ -1,0 +1,6 @@
+" Extra plugins
+Bundle "vim-scripts/PapayaWhip"
+Bundle "muellan/am-colors"
+Bundle "turly/vimstuff"
+Bundle "vim-scripts/Conque-GDB"
+Bundle "caglartoklu/fbc.vim"
